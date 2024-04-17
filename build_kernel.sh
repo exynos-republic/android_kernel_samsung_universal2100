@@ -12,5 +12,5 @@ export CLANG_TRIPLE=aarch64-linux-gnu-
 export CROSS_COMPILE=aarch64-linux-gnu- 
 export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
 
-make ARCH=arm64 exynos2100-o1sxxx_defconfig
-make ARCH=arm64 -j16
+make ARCH=arm64 O=out exynos2100-o1sxxx_defconfig
+make ARCH=arm64 O=out -j16
