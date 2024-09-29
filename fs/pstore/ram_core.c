@@ -677,7 +677,7 @@ static void pram_combine_pmsg(char *buffer, size_t count, unsigned int level)
 			rem_nsec = do_div(tv_kernel, 1000000000);
 			time64_to_tm(logger.tv_sec, 0, &tmBuf);
 
-			logbuf_len = snprintf(logbuf, LOGGER_HEADER_SIZE,
+			logbuf_len = snprintf(logbuf, LOGGER_HEADER_SIZE + 1,
 					"\n[%5lu.%06lu][%d:%16s] %02d-%02d %02d:%02d:%02d.%03d %5d %5d  ",
 					(unsigned long)tv_kernel, rem_nsec / 1000,
 					raw_smp_processor_id(), current->comm,
