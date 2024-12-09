@@ -18,6 +18,8 @@
 #include <linux/percpu.h>
 #include <linux/refcount.h>
 #include <linux/slab.h>
+#include <linux/wakeup_reason.h>
+
 
 #include <linux/irqchip.h>
 #include <linux/irqchip/arm-gic-common.h>
@@ -53,6 +55,8 @@ struct gic_chip_data {
 	bool			has_rss;
 	unsigned int		ppi_nr;
 	struct partition_desc	**ppi_descs;
+	struct cpumask		affinity_class0;
+	struct cpumask		affinity_class1;
 };
 
 static struct gic_chip_data gic_data __read_mostly;
@@ -648,6 +652,9 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
 		err = handle_domain_irq(gic_data.domain, irqnr, regs);
 		if (err) {
 			WARN_ONCE(true, "Unexpected interrupt received!\n");
+			log_abnormal_wakeup_reason(
+					"unexpected HW IRQ %u", irqnr);
+
 			gic_deactivate_unhandled(irqnr);
 		}
 		return;
@@ -1133,6 +1140,9 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
 	void __iomem *reg;
 	int enabled;
 	u64 val;
+	cpumask_t curr_mask;
+	void __iomem *iclar_reg;
+	u32 iclar_val;
 
 	if (force)
 		cpu = cpumask_first(mask_val);
@@ -1152,9 +1162,34 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
 
 	offset = convert_offset_index(d, GICD_IROUTER, &index);
 	reg = gic_dist_base(d) + offset + (index * 8);
-	val = gic_mpidr_to_affinity(cpu_logical_map(cpu));
+	cpumask_and(&curr_mask, mask_val, cpu_online_mask);
 
-	gic_write_irouter(val, reg);
+	if (!(cpumask_equal(&CPU_MASK_NONE, &gic_data.affinity_class0)) &&
+		(cpumask_equal(&curr_mask, &gic_data.affinity_class0))) {
+		val = GICD_IROUTER_SPI_MODE_ANY;
+		gic_write_irouter(val, reg);
+		iclar_reg = gic_dist_base(d) +
+			GICD_ICLAR + ((gic_irq(d) / 16) * 4);
+			iclar_val = readl_relaxed(iclar_reg) &
+				~GICD_ICLAR_MASK(gic_irq(d));
+			iclar_val |= GICD_ICLAR_CLA1NOT(gic_irq(d));
+		writel_relaxed(iclar_val, iclar_reg);
+
+	} else if (!(cpumask_equal(&CPU_MASK_NONE, &gic_data.affinity_class1)) &&
+		(cpumask_equal(&curr_mask, &gic_data.affinity_class1))) {
+		val = GICD_IROUTER_SPI_MODE_ANY;
+		gic_write_irouter(val, reg);
+		iclar_reg = gic_dist_base(d) +
+			GICD_ICLAR + ((gic_irq(d) / 16) * 4);
+			iclar_val = readl_relaxed(iclar_reg) &
+				~GICD_ICLAR_MASK(gic_irq(d));
+			iclar_val |= GICD_ICLAR_CLA0NOT(gic_irq(d));
+		writel_relaxed(iclar_val, iclar_reg);
+
+	} else {
+		val = gic_mpidr_to_affinity(cpu_logical_map(cpu));
+		gic_write_irouter(val, reg);
+	}
 
 	/*
 	 * If the interrupt was enabled, enabled it again. Otherwise,
@@ -1725,13 +1760,14 @@ static void __init gic_of_setup_kvm_info(struct device_node *node)
 	gic_set_kvm_info(&gic_v3_kvm_info);
 }
 
-static int __init gic_of_init(struct device_node *node, struct device_node *parent)
+static int __init gicv3_of_init(struct device_node *node, struct device_node *parent)
 {
 	void __iomem *dist_base;
 	struct redist_region *rdist_regs;
 	u64 redist_stride;
 	u32 nr_redist_regions;
 	int err, i;
+	const char *name;
 
 	dist_base = of_iomap(node, 0);
 	if (!dist_base) {
@@ -1769,6 +1805,17 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
 		rdist_regs[i].phys_base = res.start;
 	}
 
+	if (of_property_read_string(node, "class0-cpus", &name)) {
+		gic_data.affinity_class0 = CPU_MASK_NONE;
+	} else {
+		cpulist_parse(name, &gic_data.affinity_class0);
+	}
+	if (of_property_read_string(node, "class1-cpus", &name)) {
+		gic_data.affinity_class1 = CPU_MASK_NONE;
+	} else {
+		cpulist_parse(name, &gic_data.affinity_class1);
+	}
+
 	if (of_property_read_u64(node, "redistributor-stride", &redist_stride))
 		redist_stride = 0;
 
@@ -1795,7 +1842,7 @@ out_unmap_dist:
 	return err;
 }
 
-IRQCHIP_DECLARE(gic_v3, "arm,gic-v3", gic_of_init);
+IRQCHIP_DECLARE(gic_v3, "arm,gic-v3", gicv3_of_init);
 
 #ifdef CONFIG_ACPI
 static struct
