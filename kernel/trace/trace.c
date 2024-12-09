@@ -5726,7 +5726,7 @@ static int tracing_set_tracer(struct trace_array *tr, const char *buf)
 	}
 
 	/* If trace pipe files are being read, we can't change the tracer */
-	if (tr->trace_ref) {
+	if (tr->current_trace->ref) {
 		ret = -EBUSY;
 		goto out;
 	}
@@ -5942,7 +5942,7 @@ static int tracing_open_pipe(struct inode *inode, struct file *filp)
 
 	nonseekable_open(inode, filp);
 
-	tr->trace_ref++;
+	tr->current_trace->ref++;
 out:
 	mutex_unlock(&trace_types_lock);
 	return ret;
@@ -5961,7 +5961,7 @@ static int tracing_release_pipe(struct inode *inode, struct file *file)
 
 	mutex_lock(&trace_types_lock);
 
-	tr->trace_ref--;
+	tr->current_trace->ref--;
 
 	if (iter->trace->pipe_close)
 		iter->trace->pipe_close(iter);
@@ -5993,7 +5993,7 @@ trace_poll(struct trace_iterator *iter, struct file *filp, poll_table *poll_tabl
 		return EPOLLIN | EPOLLRDNORM;
 	else
 		return ring_buffer_poll_wait(iter->trace_buffer->buffer, iter->cpu_file,
-					     filp, poll_table, iter->tr->buffer_percent);
+					     filp, poll_table);
 }
 
 static __poll_t
@@ -7286,7 +7286,7 @@ static int tracing_buffers_open(struct inode *inode, struct file *filp)
 
 	filp->private_data = info;
 
-	tr->trace_ref++;
+	tr->current_trace->ref++;
 
 	mutex_unlock(&trace_types_lock);
 
@@ -7387,7 +7387,7 @@ static int tracing_buffers_release(struct inode *inode, struct file *file)
 
 	mutex_lock(&trace_types_lock);
 
-	iter->tr->trace_ref--;
+	iter->tr->current_trace->ref--;
 
 	__trace_array_put(iter->tr);
 
@@ -8524,7 +8524,7 @@ static int __remove_instance(struct trace_array *tr)
 {
 	int i;
 
-	if (tr->ref || (tr->current_trace && tr->trace_ref))
+	if (tr->ref || (tr->current_trace && tr->current_trace->ref))
 		return -EBUSY;
 
 	list_del(&tr->list);
