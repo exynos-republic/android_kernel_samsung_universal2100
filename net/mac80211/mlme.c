@@ -633,6 +633,8 @@ static void ieee80211_add_he_ie(struct ieee80211_sub_if_data *sdata,
 				      he_cap->he_cap_elem.phy_cap_info);
 	pos = skb_put(skb, he_cap_size);
 	ieee80211_ie_build_he_cap(pos, he_cap, pos + he_cap_size);
+
+	ieee80211_ie_build_he_6ghz_cap(sdata, skb);
 }
 
 static void ieee80211_send_assoc(struct ieee80211_sub_if_data *sdata)
@@ -699,6 +701,7 @@ static void ieee80211_send_assoc(struct ieee80211_sub_if_data *sdata)
 			2 + 1 + sizeof(struct ieee80211_he_cap_elem) + /* HE */
 				sizeof(struct ieee80211_he_mcs_nss_supp) +
 				IEEE80211_HE_PPE_THRES_MAX_LEN +
+			2 + 1 + sizeof(struct ieee80211_he_6ghz_capa) +
 			assoc_data->ie_len + /* extra IEs */
 			(assoc_data->fils_kek_len ? 16 /* AES-SIV */ : 0) +
 			9, /* WMM */
@@ -2835,7 +2838,7 @@ static void ieee80211_auth_challenge(struct ieee80211_sub_if_data *sdata,
 
 	pos = mgmt->u.auth.variable;
 	challenge = cfg80211_find_elem(WLAN_EID_CHALLENGE, pos,
-				       len - (pos - (u8 *)mgmt));
+					   len - (pos - (u8 *)mgmt));
 	if (!challenge)
 		return;
 	auth_data->expected_transaction = 4;
