@@ -1,5 +1,11 @@
 #!/bin/bash
-
+export CC=clang 
+export LD=ld.lld 
+export LLVM=1 
+export LLVM_IAS=1 
+export CLANG_TRIPLE=aarch64-linux-gnu- 
+export CROSS_COMPILE=aarch64-linux-gnu- 
+export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
 export ARCH=arm64
 export PLATFORM_VERSION=11
 export ANDROID_MAJOR_VERSION=r
