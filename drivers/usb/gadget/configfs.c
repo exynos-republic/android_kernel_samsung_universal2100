@@ -1658,8 +1658,6 @@ static void configfs_composite_disconnect(struct usb_gadget *gadget)
 }
 #endif // CONFIG_USB_CONFIGFS_UEVENT
 
-#endif // CONFIG_USB_CONFIGFS_UEVENT
-
 static void configfs_composite_suspend(struct usb_gadget *gadget)
 {
 	struct usb_composite_dev *cdev;

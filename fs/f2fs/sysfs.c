@@ -578,7 +578,6 @@ static void __sec_bigdata_init_value(struct f2fs_sb_info *sbi,
 		sbi->s_sec_capacity_apps_kb = 0;
 	}
 }
-#endif
 
 static ssize_t f2fs_sbi_show(struct f2fs_attr *a,
 			struct f2fs_sb_info *sbi, char *buf)

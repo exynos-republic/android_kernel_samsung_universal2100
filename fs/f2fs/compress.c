@@ -1275,7 +1275,7 @@ static int f2fs_write_raw_pages(struct compress_ctx *cc,
 {
 	struct address_space *mapping = cc->inode->i_mapping;
 	int _submitted, compr_blocks, ret;
-	int i;
+	int i = -1, err = 0;
 
 	compr_blocks = f2fs_compressed_blocks(cc);
 
