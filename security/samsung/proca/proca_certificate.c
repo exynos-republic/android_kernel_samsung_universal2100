@@ -39,6 +39,8 @@
 #include "proca_certificate-asn1.h"
 #endif
 
+#pragma GCC diagnostic ignored "-Wvla-extension"
+
 static struct crypto_shash *g_validation_shash;
 
 int proca_certificate_get_flags(void *context, size_t hdrlen,
