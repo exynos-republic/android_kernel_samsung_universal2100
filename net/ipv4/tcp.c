@@ -2396,6 +2396,10 @@ void tcp_set_state(struct sock *sk, int state)
 		if (oldstate == TCP_SYN_RECV)
 			TCP_INC_STATS(sock_net(sk), TCP_MIB_CURRESTAB);
 		break;
+	case TCP_CLOSE_WAIT:
+		if (oldstate == TCP_SYN_RECV)
+			TCP_INC_STATS(sock_net(sk), TCP_MIB_CURRESTAB);
+		break;
 
 	case TCP_CLOSE:
 		if (oldstate == TCP_CLOSE_WAIT || oldstate == TCP_ESTABLISHED)
@@ -2408,7 +2412,7 @@ void tcp_set_state(struct sock *sk, int state)
 		/* fall through */
 	default:
 	#ifdef CONFIG_MPTCP
-		if (oldstate == TCP_ESTABLISHED) {
+		if (oldstate == TCP_ESTABLISHED || oldstate == TCP_CLOSE_WAIT) {
 			TCP_DEC_STATS(sock_net(sk), TCP_MIB_CURRESTAB);
 			if (is_meta_sk(sk))
 				MPTCP_DEC_STATS(sock_net(sk), MPTCP_MIB_CURRESTAB);
@@ -2944,6 +2948,7 @@ int tcp_disconnect(struct sock *sk, int flags)
 	/* Clean up fastopen related fields */
 	tcp_free_fastopen_req(tp);
 	inet->defer_connect = 0;
+	tp->fastopen_client_fail = 0;
 
 	WARN_ON(inet->inet_num && !icsk->icsk_bind_hash);
 
@@ -3709,6 +3714,7 @@ void tcp_get_info(struct sock *sk, struct tcp_info *info)
 	if (!no_lock)
 		unlock_sock_fast(sk, slow);
 #else
+	info->tcpi_fastopen_client_fail = tp->fastopen_client_fail;
 	unlock_sock_fast(sk, slow);
 #endif
 }
