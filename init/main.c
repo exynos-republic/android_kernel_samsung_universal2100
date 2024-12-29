@@ -674,6 +674,7 @@ asmlinkage __visible void __init start_kernel(void)
 #ifdef CONFIG_RKP
 	rkp_init();
 #endif
+	poking_init();
 	ftrace_init();
 
 	/* trace_printk can be enabled here */

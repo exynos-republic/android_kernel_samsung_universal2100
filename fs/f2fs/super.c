@@ -619,7 +619,7 @@ static int parse_options(struct super_block *sb, char *options, bool is_remount)
 	int ext_cnt;
 #endif
 	char *p, *name;
-	int arg = 0;
+	int arg = 0, ext_cnt;
 	kuid_t uid;
 	kgid_t gid;
 	int ret;

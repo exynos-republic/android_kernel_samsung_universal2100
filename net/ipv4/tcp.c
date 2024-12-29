@@ -2852,7 +2852,7 @@ int tcp_disconnect(struct sock *sk, int flags)
 	}
 #endif
 
-	sk->sk_shutdown = 0;
+	WRITE_ONCE(sk->sk_shutdown, 0);
 	sock_reset_flag(sk, SOCK_DONE);
 #ifndef CONFIG_MPTCP
 	tp->srtt_us = 0;

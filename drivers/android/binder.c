@@ -74,6 +74,7 @@
 
 #include "binder_internal.h"
 #include "binder_trace.h"
+#include <trace/hooks/binder.h>
 
 #ifdef CONFIG_SAMSUNG_FREECESS
 #include <linux/freecess.h>
@@ -2883,7 +2884,6 @@ static int binder_proc_transaction(struct binder_transaction *t,
 	}
 
 	binder_inner_proc_lock(proc);
-
 	if (proc->is_frozen) {
 		proc->sync_recv |= !oneway;
 		proc->async_recv |= oneway;
@@ -5543,7 +5543,7 @@ static long binder_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
     // ] @SystemFW
 
     // ++ Google Freezer
-    case BINDER_FREEZE: {
+	case BINDER_FREEZE: {
 		struct binder_freeze_info info;
 		struct binder_proc **target_procs = NULL, *target_proc;
 		int target_procs_count = 0, i = 0;
@@ -5603,6 +5603,7 @@ static long binder_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			goto err;
 		break;
 	}
+
 	case BINDER_GET_FROZEN_INFO: {
 		struct binder_frozen_status_info info;
 
@@ -5621,7 +5622,6 @@ static long binder_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		}
 		break;
 	}
-    // -- Google Freezer
 	default:
 		ret = -EINVAL;
 		goto err;

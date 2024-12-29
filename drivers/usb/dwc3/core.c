@@ -1756,6 +1756,14 @@ int dwc3_probe(struct platform_device *pdev,
 	spin_lock_init(&dwc->lock);
 	init_completion(&dwc->disconnect);
 
+	pm_runtime_get_noresume(dev);
+	pm_runtime_set_active(dev);
+	pm_runtime_use_autosuspend(dev);
+	pm_runtime_set_autosuspend_delay(dev, DWC3_DEFAULT_AUTOSUSPEND_DELAY);
+	pm_runtime_enable(dev);
+
+	pm_runtime_forbid(dev);
+
 	ret = dwc3_alloc_event_buffers(dwc, DWC3_EVENT_BUFFERS_SIZE);
 	if (ret) {
 		dev_err(dwc->dev, "failed to allocate event buffers\n");
@@ -1792,6 +1800,8 @@ int dwc3_probe(struct platform_device *pdev,
 	exynos_usbdrd_phy_conn(dwc->usb2_generic_phy, 0);
 
 	pr_info("%s: ---\n", __func__);
+	dma_set_max_seg_size(dev, UINT_MAX);
+
 	return 0;
 
 err5:
@@ -1820,6 +1830,10 @@ err2:
 	pr_info("%s err = %d\n", __func__, ret);
 
 #if 0
+	pm_runtime_allow(dev);
+	pm_runtime_disable(dev);
+	pm_runtime_set_suspended(dev);
+	pm_runtime_put_noidle(dev);
 disable_clks:
 	clk_bulk_disable_unprepare(dwc->num_clks, dwc->clks);
 assert_reset:

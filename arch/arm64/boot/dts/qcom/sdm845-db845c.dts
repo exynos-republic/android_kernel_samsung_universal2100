@@ -4469,6 +4469,7 @@
 			gpios = <0xb2 0x0d 0x00>;
 			linux,default-trigger = "panic-indicator";
 			default-state = "off";
+			panic-indicator;
 		};
 
 		wlan {
@@ -4488,13 +4489,11 @@
 
 	hdmi-out {
 		compatible = "hdmi-connector";
-		type = [61 00];
+		type = "a";
 
 		port {
-
-			endpoint {
-				remote-endpoint = <0xd2>;
-				phandle = <0x4e>;
+			hdmi_con: endpoint {
+				remote-endpoint = <&lt9611_out>;
 			};
 		};
 	};

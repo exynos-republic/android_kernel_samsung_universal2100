@@ -1297,7 +1297,7 @@ retry_flush_nodes:
 		if (err) {
 			up_write(&sbi->node_change);
 			f2fs_unlock_all(sbi);
-			goto out;
+			return err;
 		}
 		blk_flush_plug(current);
 		sec_dbg_add_time(dbg_entry, NODES, s_jiffies);

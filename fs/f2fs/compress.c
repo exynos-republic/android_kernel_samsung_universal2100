@@ -848,18 +848,32 @@ static int f2fs_compressed_blocks(struct compress_ctx *cc)
 }
 
 /* return # of valid blocks in compressed cluster */
+static int f2fs_cluster_blocks(struct compress_ctx *cc, bool compr)
+{
+	return __f2fs_cluster_blocks(cc->inode, cc->cluster_idx, false);
+}
+
 int f2fs_is_compressed_cluster(struct inode *inode, pgoff_t index)
 {
-	return __f2fs_cluster_blocks(inode,
-		index >> F2FS_I(inode)->i_log_cluster_size,
-		false);
+	struct compress_ctx cc = {
+		.inode = inode,
+		.log_cluster_size = F2FS_I(inode)->i_log_cluster_size,
+		.cluster_size = F2FS_I(inode)->i_cluster_size,
+		.cluster_idx = index >> F2FS_I(inode)->i_log_cluster_size,
+	};
+
+	return f2fs_cluster_blocks(&cc, false);
 }
 
 static bool cluster_may_compress(struct compress_ctx *cc)
 {
 	if (!f2fs_need_compress_data(cc->inode))
 		return false;
+	if (!f2fs_compressed_file(cc->inode))
+		return false;
 	if (f2fs_is_atomic_file(cc->inode))
+		return false;
+	if (f2fs_is_mmap_file(cc->inode))
 		return false;
 	if (!f2fs_cluster_is_full(cc))
 		return false;
@@ -899,7 +913,7 @@ static int prepare_compress_overwrite(struct compress_ctx *cc,
 	int i, ret;
 
 retry:
-	ret = f2fs_is_compressed_cluster(cc->inode, start_idx);
+	ret = f2fs_cluster_blocks(cc, false);
 	if (ret <= 0)
 		return ret;
 
@@ -1274,7 +1288,8 @@ static int f2fs_write_raw_pages(struct compress_ctx *cc,
 	}
 
 	if (compr_blocks < 0)
-		return compr_blocks;
+		err = compr_blocks;
+        goto out_err;
 
 	for (i = 0; i < cc->cluster_size; i++) {
 		if (!cc->rpages[i])
@@ -1294,9 +1309,12 @@ continue_unlock:
 		if (!clear_page_dirty_for_io(cc->rpages[i]))
 			goto continue_unlock;
 
+        BUG_ON(!PageLocked(cc->rpages[i]));
+        
 		ret = f2fs_write_single_data_page(cc->rpages[i], &_submitted,
 						NULL, NULL, wbc, io_type,
 						compr_blocks, false);
+                        
 		if (ret) {
 			if (ret == AOP_WRITEPAGE_ACTIVATE) {
 				unlock_page(cc->rpages[i]);
@@ -1307,15 +1325,20 @@ continue_unlock:
 				 * avoid deadlock caused by cluster update race
 				 * from foreground operation.
 				 */
-				if (IS_NOQUOTA(cc->inode))
-					return 0;
+				if (IS_NOQUOTA(cc->inode)) {
+					err = 0;
+					goto out_err;
+				}
 				ret = 0;
 				cond_resched();
 				congestion_wait(BLK_RW_ASYNC,
 						DEFAULT_IO_TIMEOUT);
+				lock_page(cc->rpages[i]);
+				clear_page_dirty_for_io(cc->rpages[i]);
 				goto retry_write;
 			}
-			return ret;
+			err = ret;
+			goto out_err;
 		}
 
 		*submitted += _submitted;
@@ -1324,6 +1347,15 @@ continue_unlock:
 	f2fs_balance_fs(F2FS_M_SB(mapping), true);
 
 	return 0;
+
+out_err:
+	for (++i; i < cc->cluster_size; i++) {
+		if (!cc->rpages[i])
+			continue;
+		redirty_page_for_writepage(wbc, cc->rpages[i]);
+		unlock_page(cc->rpages[i]);
+	}
+	return err;
 }
 
 int f2fs_write_multi_pages(struct compress_ctx *cc,
